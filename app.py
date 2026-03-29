@@ -275,11 +275,39 @@ def load_all_data():
 
 
 def main():
-    st.set_page_config(page_title="KPMG IxT - Akıllı Yatırım Asistanı", layout="centered")
-    st.title("KPMG IxT - Akıllı Yatırım Asistanı")
-    st.caption("Veri kaynakları: makro_gostergeler.csv, genel_ozet.csv, yatirimci_profilleri.csv, portfoy_onerileri.csv, fon_gostergeleri.csv")
+    st.set_page_config(page_title="Robo Investment Advisor", layout="centered")
+    st.markdown(
+        """
+        <style>
+        .stApp { background-color: #FFFFFF; }
+        h1, h2, h3 { color: #00338D !important; }
+        div[data-testid="stNumberInput"] label,
+        div[role="radiogroup"] > label,
+        .stMarkdown, .stCaption { color: #00338D; }
+        div[data-testid="stButton"] > button {
+            background-color: #00338D !important;
+            color: #FFFFFF !important;
+            border: 1px solid #00338D !important;
+            font-weight: 600 !important;
+            border-radius: 8px !important;
+        }
+        div[data-testid="stButton"] > button:hover {
+            background-color: #00286F !important;
+            border-color: #00286F !important;
+        }
+        .accent-divider {
+            border-top: 2px solid #0091DA;
+            margin: 10px 0 16px 0;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.title("Robo Investment Advisor")
+    st.markdown('<div class="accent-divider"></div>', unsafe_allow_html=True)
+    st.caption("Veri kaynakları: genel_ozet.csv, yatirimci_profilleri.csv, portfoy_onerileri.csv, fon_gostergeleri.csv")
 
-    market_df, findings, profile_notes, weights_df, returns_df, funds_df = load_all_data()
+    _, findings, profile_notes, weights_df, returns_df, funds_df = load_all_data()
 
     if weights_df.empty:
         st.error("Portföy ağırlıkları okunamadı. Lütfen CSV formatını kontrol edin.")
@@ -294,21 +322,9 @@ def main():
     if "balon_goster" not in st.session_state:
         st.session_state.balon_goster = False
 
-    top_container = st.container()
-    with top_container:
-        st.subheader("Kapak Göstergeleri")
-        if not market_df.empty:
-            latest = market_df.iloc[-1]
-            prev = market_df.iloc[-2] if len(market_df) > 1 else latest
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Dönem", str(latest["Dönem"]))
-            c2.metric("Enflasyon", f"%{float(latest['Enflasyon']):.2f}", delta=f"{float(latest['Enflasyon']) - float(prev['Enflasyon']):+.2f} pp")
-            c3.metric("Politika Faizi", f"%{float(latest['Politika Faizi']):.2f}", delta=f"{float(latest['Politika Faizi']) - float(prev['Politika Faizi']):+.2f} pp")
-        else:
-            st.info("Makro göstergeler okunamadı.")
-
     if st.session_state.asama == 1:
         st.subheader("Aşama 1: Giriş ve Yatırım Tutarı")
+        st.markdown('<div class="accent-divider"></div>', unsafe_allow_html=True)
         with st.container(border=True):
             amount = st.number_input(
                 "Yatırıma ayırmak istediğiniz toplam tutar nedir? (TL)",
@@ -323,6 +339,7 @@ def main():
 
     elif st.session_state.asama == 2:
         st.subheader("Aşama 2: Risk Anketi")
+        st.markdown('<div class="accent-divider"></div>', unsafe_allow_html=True)
         with st.container(border=True):
             q1 = st.radio("Soru 1: Yatırım vadeniz nedir?", ["Kısa", "Orta", "Uzun"], index=1)
             q2 = st.radio(
@@ -357,7 +374,7 @@ def main():
                 "Agresif alım yaparım": 5,
             }
 
-            if st.button("Hesapla", type="primary", use_container_width=True):
+            if st.button("Portföyümü Oluştur", type="primary", use_container_width=True):
                 selected_profile = suggest_profile_from_quiz(
                     [score_map[q1], score_map[q2], score_map[q3], score_map[q4]]
                 )
@@ -375,6 +392,7 @@ def main():
             st.session_state.balon_goster = False
 
         st.subheader("Aşama 3: Sonuç Ekranı")
+        st.markdown('<div class="accent-divider"></div>', unsafe_allow_html=True)
         st.success(f"Atanan Yatırım Profili: {UI_PROFILE_LABELS[selected_profile]}")
 
         notes = profile_notes.get(selected_profile, {})
@@ -398,7 +416,13 @@ def main():
             show_df["AmountTL"] = show_df["AmountTL"].map(lambda x: f"{x:,.0f} TL")
             st.dataframe(show_df, use_container_width=True, hide_index=True)
 
-            fig = px.pie(portfolio, names="Asset", values="AmountTL", title="Portföy Dağılımı - Plotly Pie")
+            fig = px.pie(
+                portfolio,
+                names="Asset",
+                values="AmountTL",
+                title="Portföy Dağılımı",
+                color_discrete_sequence=["#00338D", "#005EB8", "#0091DA", "#66C7F4", "#B8E4FA", "#E8F4FC", "#FFFFFF"],
+            )
             fig.update_traces(textposition="inside", textinfo="percent+label")
             st.plotly_chart(fig, use_container_width=True)
 
@@ -408,7 +432,7 @@ def main():
                 st.markdown(f"- **{title}:** {detail}")
 
         with st.container(border=True):
-            st.markdown("### Historical Performance Simulation")
+            st.markdown("### Tarihsel Performans Simülasyonu")
             years = st.slider("Simülasyon süresi (yıl)", min_value=1, max_value=5, value=5)
             scenario = returns_df[returns_df["Profil"] == selected_profile]
             if not scenario.empty:
@@ -436,6 +460,9 @@ def main():
             st.session_state.asama = 1
             st.session_state.final_profile = ""
             st.rerun()
+
+    st.markdown('<div class="accent-divider"></div>', unsafe_allow_html=True)
+    st.caption("Bu uygulama KPMG Final Case çalışması kapsamında hazırlanmış bir simülasyondur. Gerçek yatırım tavsiyesi değildir.")
 
 
 if __name__ == "__main__":
