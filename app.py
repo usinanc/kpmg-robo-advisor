@@ -279,11 +279,18 @@ def main():
     st.markdown(
         """
         <style>
-        .stApp { background-color: #FFFFFF; }
+        .stApp { background-color: transparent; }
         h1, h2, h3 { color: #00338D !important; }
         div[data-testid="stNumberInput"] label,
         div[role="radiogroup"] > label,
-        .stMarkdown, .stCaption { color: #00338D; }
+        .stMarkdown, .stCaption, p, label, span, div {
+            color: inherit !important;
+        }
+        div[data-testid="stVerticalBlock"] > div:has(> div[data-testid="stMarkdownContainer"]),
+        div[data-testid="stHorizontalBlock"] > div {
+            background-color: color-mix(in srgb, currentColor 6%, transparent);
+            border-radius: 10px;
+        }
         div[data-testid="stButton"] > button {
             background-color: #00338D !important;
             color: #FFFFFF !important;
@@ -306,6 +313,7 @@ def main():
     st.title("Robo Investment Advisor")
     st.markdown('<div class="accent-divider"></div>', unsafe_allow_html=True)
     st.caption("Veri kaynakları: genel_ozet.csv, yatirimci_profilleri.csv, portfoy_onerileri.csv, fon_gostergeleri.csv")
+    theme_base = (st.get_option("theme.base") or "light").lower()
 
     _, findings, profile_notes, weights_df, returns_df, funds_df = load_all_data()
 
@@ -424,6 +432,12 @@ def main():
                 color_discrete_sequence=["#00338D", "#005EB8", "#0091DA", "#66C7F4", "#B8E4FA", "#E8F4FC", "#FFFFFF"],
             )
             fig.update_traces(textposition="inside", textinfo="percent+label")
+            fig.update_layout(
+                template="plotly_dark" if theme_base == "dark" else "plotly_white",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#FFFFFF" if theme_base == "dark" else "#111111"),
+            )
             st.plotly_chart(fig, use_container_width=True)
 
         with st.container(border=True):
