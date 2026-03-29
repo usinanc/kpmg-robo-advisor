@@ -19,17 +19,15 @@ FILES = {
 }
 
 UI_PROFILE_LABELS = {
-    "Defansif": "Defensive",
-    "Temkinli": "Conservative",
-    "Dengeli": "Balanced",
-    "Büyüme": "Growth-Oriented",
-    "Spekülatif": "Speculative",
+    "Defansif": "Defansif",
+    "Temkinli": "Temkinli",
+    "Dengeli": "Dengeli",
+    "Büyüme": "Büyüme Odaklı",
+    "Spekülatif": "Spekülatif",
 }
 
-EN_TO_TR = {v: k for k, v in UI_PROFILE_LABELS.items()}
-
 # From user-provided analysis-summary example.
-PPTX_BENCHMARK_MULTIPLIERS_5Y = {"Growth-Oriented": 12.5}
+PPTX_BENCHMARK_MULTIPLIERS_5Y = {"Büyüme Odaklı": 12.5}
 
 
 def normalize_text(value: str) -> str:
@@ -277,8 +275,8 @@ def load_all_data():
 
 
 def main():
-    st.set_page_config(page_title="Robo Investment Advisory", layout="wide")
-    st.title("Robo-Investment Advisory (TR)")
+    st.set_page_config(page_title="KPMG IxT - Akıllı Yatırım Asistanı", layout="centered")
+    st.title("KPMG IxT - Akıllı Yatırım Asistanı")
     st.caption("Veri kaynakları: makro_gostergeler.csv, genel_ozet.csv, yatirimci_profilleri.csv, portfoy_onerileri.csv, fon_gostergeleri.csv")
 
     market_df, findings, profile_notes, weights_df, returns_df, funds_df = load_all_data()
@@ -287,12 +285,14 @@ def main():
         st.error("Portföy ağırlıkları okunamadı. Lütfen CSV formatını kontrol edin.")
         return
 
-    if "step_done" not in st.session_state:
-        st.session_state.step_done = False
+    if "asama" not in st.session_state:
+        st.session_state.asama = 1
     if "final_amount" not in st.session_state:
         st.session_state.final_amount = 250000.0
     if "final_profile" not in st.session_state:
         st.session_state.final_profile = ""
+    if "balon_goster" not in st.session_state:
+        st.session_state.balon_goster = False
 
     top_container = st.container()
     with top_container:
@@ -307,59 +307,75 @@ def main():
         else:
             st.info("Makro göstergeler okunamadı.")
 
-    if not st.session_state.step_done:
-        st.subheader("Adım 1: Tutar ve Risk Anketi")
+    if st.session_state.asama == 1:
+        st.subheader("Aşama 1: Giriş ve Yatırım Tutarı")
         with st.container(border=True):
-            amount = st.number_input("Toplam yatırım tutarı (TL)", min_value=1000.0, value=float(st.session_state.final_amount), step=5000.0)
-            st.markdown("### 5 Soruluk Risk Anketi")
-            q1 = st.radio("1) Dalgalanmada davranışınız?", ["Hemen çıkarım", "Bir kısmını azaltırım", "Beklerim", "Ek alım yaparım", "Yüksek riski severim"], index=2)
-            q2 = st.radio("2) Yatırım vadeniz?", ["< 1 yıl", "1-2 yıl", "2-3 yıl", "3-5 yıl", "5+ yıl"], index=2)
-            q3 = st.radio("3) Ana hedefiniz?", ["Sermaye koruma", "Düzenli gelir", "Dengeli büyüme", "Yüksek büyüme", "Agresif getiri"], index=2)
-            q4 = st.radio("4) Maksimum kabul edilebilir düşüş?", ["%5", "%10", "%20", "%30", "%40+"], index=1)
-            q5 = st.radio("5) Kısa vadeli yüksek oynaklığa yaklaşımınız?", ["Asla istemem", "Düşük düzeyde kabul ederim", "Orta düzeyde kabul ederim", "Yüksek düzeyde kabul ederim", "Fırsat olarak görürüm"], index=2)
+            amount = st.number_input(
+                "Yatırıma ayırmak istediğiniz toplam tutar nedir? (TL)",
+                min_value=1000.0,
+                value=float(st.session_state.final_amount),
+                step=5000.0,
+            )
+            if st.button("Risk Anketine Geç", type="primary", use_container_width=True):
+                st.session_state.final_amount = amount
+                st.session_state.asama = 2
+                st.rerun()
 
+    elif st.session_state.asama == 2:
+        st.subheader("Aşama 2: Risk Anketi")
+        with st.container(border=True):
+            q1 = st.radio("Soru 1: Yatırım vadeniz nedir?", ["Kısa", "Orta", "Uzun"], index=1)
+            q2 = st.radio(
+                "Soru 2: Ana paranızın değer kaybetme riskine ne kadar tahammülünüz var?",
+                ["Hiç yok", "Az", "Orta", "Yüksek"],
+                index=1,
+            )
+            q3 = st.radio(
+                "Soru 3: Getiri beklentiniz nedir?",
+                ["Enflasyon üzeri koruma", "Dengeli büyüme", "Maksimum kazanç"],
+                index=1,
+            )
+            q4 = st.radio(
+                "Soru 4: Piyasa dalgalandığında en olası yaklaşımınız nedir?",
+                ["Pozisyonumu korurum", "Sınırlı değişiklik yaparım", "Fırsat gördükçe artırırım", "Agresif alım yaparım"],
+                index=1,
+            )
             score_map = {
-                "Hemen çıkarım": 1,
-                "Bir kısmını azaltırım": 2,
-                "Beklerim": 3,
-                "Ek alım yaparım": 4,
-                "Yüksek riski severim": 5,
-                "< 1 yıl": 1,
-                "1-2 yıl": 2,
-                "2-3 yıl": 3,
-                "3-5 yıl": 4,
-                "5+ yıl": 5,
-                "Sermaye koruma": 1,
-                "Düzenli gelir": 2,
+                "Kısa": 1,
+                "Orta": 3,
+                "Uzun": 5,
+                "Hiç yok": 1,
+                "Az": 2,
+                "Orta": 3,
+                "Yüksek": 5,
+                "Enflasyon üzeri koruma": 1,
                 "Dengeli büyüme": 3,
-                "Yüksek büyüme": 4,
-                "Agresif getiri": 5,
-                "%5": 1,
-                "%10": 2,
-                "%20": 3,
-                "%30": 4,
-                "%40+": 5,
-                "Asla istemem": 1,
-                "Düşük düzeyde kabul ederim": 2,
-                "Orta düzeyde kabul ederim": 3,
-                "Yüksek düzeyde kabul ederim": 4,
-                "Fırsat olarak görürüm": 5,
+                "Maksimum kazanç": 5,
+                "Pozisyonumu korurum": 1,
+                "Sınırlı değişiklik yaparım": 2,
+                "Fırsat gördükçe artırırım": 4,
+                "Agresif alım yaparım": 5,
             }
 
-            if st.button("Calculate", type="primary", use_container_width=True):
+            if st.button("Hesapla", type="primary", use_container_width=True):
                 selected_profile = suggest_profile_from_quiz(
-                    [score_map[q1], score_map[q2], score_map[q3], score_map[q4], score_map[q5]]
+                    [score_map[q1], score_map[q2], score_map[q3], score_map[q4]]
                 )
-                st.session_state.final_amount = amount
                 st.session_state.final_profile = selected_profile
-                st.session_state.step_done = True
+                st.session_state.asama = 3
+                st.session_state.balon_goster = True
                 st.rerun()
-    else:
+
+    elif st.session_state.asama == 3:
         amount = float(st.session_state.final_amount)
         selected_profile = st.session_state.final_profile
 
-        st.subheader("Adım 2: Sonuçlar")
-        st.success(f"Atanan Yatırım Profili: {selected_profile} ({UI_PROFILE_LABELS[selected_profile]})")
+        if st.session_state.balon_goster:
+            st.balloons()
+            st.session_state.balon_goster = False
+
+        st.subheader("Aşama 3: Sonuç Ekranı")
+        st.success(f"Atanan Yatırım Profili: {UI_PROFILE_LABELS[selected_profile]}")
 
         notes = profile_notes.get(selected_profile, {})
         with st.container(border=True):
@@ -387,7 +403,7 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
 
         with st.container(border=True):
-            st.markdown("### Rationale / Basic Findings")
+            st.markdown("### Yatırım Gerekçesi / Temel Bulgular")
             for title, detail in findings[:6]:
                 st.markdown(f"- **{title}:** {detail}")
 
@@ -414,10 +430,10 @@ def main():
             selected_en = UI_PROFILE_LABELS[selected_profile]
             if selected_en in PPTX_BENCHMARK_MULTIPLIERS_5Y and years == 5:
                 bench = PPTX_BENCHMARK_MULTIPLIERS_5Y[selected_en]
-                st.markdown(f"**Analysis summary benchmark:** {selected_en} profilinde 5 yılda yaklaşık `x{bench}` senaryo örneği.")
+                st.markdown(f"**Analiz özeti benchmark:** {selected_en} profilinde 5 yılda yaklaşık `x{bench}` senaryo örneği.")
 
-        if st.button("Recalculate / Retake Quiz", use_container_width=True):
-            st.session_state.step_done = False
+        if st.button("Yeniden Hesapla / Anketi Tekrarla", use_container_width=True):
+            st.session_state.asama = 1
             st.session_state.final_profile = ""
             st.rerun()
 
