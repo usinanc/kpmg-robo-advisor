@@ -214,13 +214,13 @@ def parse_funds(lines: List[str]) -> pd.DataFrame:
 
 def suggest_profile_from_quiz(scores: List[int]) -> str:
     total = sum(scores)
-    if total <= 7:
+    if total <= 8:
         return "Defansif"
-    if total <= 11:
+    if total <= 12:
         return "Temkinli"
-    if total <= 15:
+    if total <= 16:
         return "Dengeli"
-    if total <= 18:
+    if total <= 20:
         return "Büyüme"
     return "Spekülatif"
 
@@ -287,50 +287,84 @@ def main():
         st.error("Portföy ağırlıkları okunamadı. Lütfen CSV formatını kontrol edin.")
         return
 
-    st.sidebar.header("Yatırım Bilgileri")
-    amount = st.sidebar.number_input("Toplam yatırım tutarı (TL)", min_value=1000.0, value=250000.0, step=5000.0)
-    method = st.sidebar.radio("Profil belirleme yöntemi", ["Hızlı seçim", "Risk anketi"])
+    if "step_done" not in st.session_state:
+        st.session_state.step_done = False
+    if "final_amount" not in st.session_state:
+        st.session_state.final_amount = 250000.0
+    if "final_profile" not in st.session_state:
+        st.session_state.final_profile = ""
 
-    if method == "Hızlı seçim":
-        selected_en = st.sidebar.selectbox("Risk profili", list(EN_TO_TR.keys()))
-        selected_profile = EN_TO_TR[selected_en]
+    top_container = st.container()
+    with top_container:
+        st.subheader("Kapak Göstergeleri")
+        if not market_df.empty:
+            latest = market_df.iloc[-1]
+            prev = market_df.iloc[-2] if len(market_df) > 1 else latest
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Dönem", str(latest["Dönem"]))
+            c2.metric("Enflasyon", f"%{float(latest['Enflasyon']):.2f}", delta=f"{float(latest['Enflasyon']) - float(prev['Enflasyon']):+.2f} pp")
+            c3.metric("Politika Faizi", f"%{float(latest['Politika Faizi']):.2f}", delta=f"{float(latest['Politika Faizi']) - float(prev['Politika Faizi']):+.2f} pp")
+        else:
+            st.info("Makro göstergeler okunamadı.")
+
+    if not st.session_state.step_done:
+        st.subheader("Adım 1: Tutar ve Risk Anketi")
+        with st.container(border=True):
+            amount = st.number_input("Toplam yatırım tutarı (TL)", min_value=1000.0, value=float(st.session_state.final_amount), step=5000.0)
+            st.markdown("### 5 Soruluk Risk Anketi")
+            q1 = st.radio("1) Dalgalanmada davranışınız?", ["Hemen çıkarım", "Bir kısmını azaltırım", "Beklerim", "Ek alım yaparım", "Yüksek riski severim"], index=2)
+            q2 = st.radio("2) Yatırım vadeniz?", ["< 1 yıl", "1-2 yıl", "2-3 yıl", "3-5 yıl", "5+ yıl"], index=2)
+            q3 = st.radio("3) Ana hedefiniz?", ["Sermaye koruma", "Düzenli gelir", "Dengeli büyüme", "Yüksek büyüme", "Agresif getiri"], index=2)
+            q4 = st.radio("4) Maksimum kabul edilebilir düşüş?", ["%5", "%10", "%20", "%30", "%40+"], index=1)
+            q5 = st.radio("5) Kısa vadeli yüksek oynaklığa yaklaşımınız?", ["Asla istemem", "Düşük düzeyde kabul ederim", "Orta düzeyde kabul ederim", "Yüksek düzeyde kabul ederim", "Fırsat olarak görürüm"], index=2)
+
+            score_map = {
+                "Hemen çıkarım": 1,
+                "Bir kısmını azaltırım": 2,
+                "Beklerim": 3,
+                "Ek alım yaparım": 4,
+                "Yüksek riski severim": 5,
+                "< 1 yıl": 1,
+                "1-2 yıl": 2,
+                "2-3 yıl": 3,
+                "3-5 yıl": 4,
+                "5+ yıl": 5,
+                "Sermaye koruma": 1,
+                "Düzenli gelir": 2,
+                "Dengeli büyüme": 3,
+                "Yüksek büyüme": 4,
+                "Agresif getiri": 5,
+                "%5": 1,
+                "%10": 2,
+                "%20": 3,
+                "%30": 4,
+                "%40+": 5,
+                "Asla istemem": 1,
+                "Düşük düzeyde kabul ederim": 2,
+                "Orta düzeyde kabul ederim": 3,
+                "Yüksek düzeyde kabul ederim": 4,
+                "Fırsat olarak görürüm": 5,
+            }
+
+            if st.button("Calculate", type="primary", use_container_width=True):
+                selected_profile = suggest_profile_from_quiz(
+                    [score_map[q1], score_map[q2], score_map[q3], score_map[q4], score_map[q5]]
+                )
+                st.session_state.final_amount = amount
+                st.session_state.final_profile = selected_profile
+                st.session_state.step_done = True
+                st.rerun()
     else:
-        q1 = st.sidebar.radio("1) Dalgalanmada davranışınız?", ["Hemen çıkarım", "Bir kısmını azaltırım", "Beklerim", "Ek alım yaparım", "Yüksek riski severim"], index=2)
-        q2 = st.sidebar.radio("2) Yatırım vadeniz?", ["< 1 yıl", "1-2 yıl", "2-3 yıl", "3-5 yıl", "5+ yıl"], index=2)
-        q3 = st.sidebar.radio("3) Ana hedefiniz?", ["Sermaye koruma", "Düzenli gelir", "Dengeli büyüme", "Yüksek büyüme", "Agresif getiri"], index=2)
-        q4 = st.sidebar.radio("4) Maksimum kabul edilebilir düşüş?", ["%5", "%10", "%20", "%30", "%40+"], index=1)
-        score_map = {
-            "Hemen çıkarım": 1,
-            "Bir kısmını azaltırım": 2,
-            "Beklerim": 3,
-            "Ek alım yaparım": 4,
-            "Yüksek riski severim": 5,
-            "< 1 yıl": 1,
-            "1-2 yıl": 2,
-            "2-3 yıl": 3,
-            "3-5 yıl": 4,
-            "5+ yıl": 5,
-            "Sermaye koruma": 1,
-            "Düzenli gelir": 2,
-            "Dengeli büyüme": 3,
-            "Yüksek büyüme": 4,
-            "Agresif getiri": 5,
-            "%5": 1,
-            "%10": 2,
-            "%20": 3,
-            "%30": 4,
-            "%40+": 5,
-        }
-        selected_profile = suggest_profile_from_quiz([score_map[q1], score_map[q2], score_map[q3], score_map[q4]])
-        st.sidebar.success(f"Önerilen profil: {selected_profile} ({UI_PROFILE_LABELS[selected_profile]})")
+        amount = float(st.session_state.final_amount)
+        selected_profile = st.session_state.final_profile
 
-    left, right = st.columns([1.2, 1])
+        st.subheader("Adım 2: Sonuçlar")
+        st.success(f"Atanan Yatırım Profili: {selected_profile} ({UI_PROFILE_LABELS[selected_profile]})")
 
-    with left:
-        st.subheader(f"Önerilen Profil: {selected_profile} ({UI_PROFILE_LABELS[selected_profile]})")
         notes = profile_notes.get(selected_profile, {})
-        if notes:
-            st.markdown(f"- **Tanım:** {notes.get('Tanım', '-')}")
+        with st.container(border=True):
+            st.markdown("### Profil Tanımı")
+            st.write(notes.get("Tanım", "-"))
             st.markdown(f"- **Risk Seviyesi:** {notes.get('Risk Seviyesi', '-')}")
             st.markdown(f"- **Yatırım Ufku:** {notes.get('Yatırım Ufku', '-')}")
             st.markdown(f"- **Beklenen Getiri:** {notes.get('Beklenen Getiri', '-')}")
@@ -341,58 +375,51 @@ def main():
         portfolio["AmountTL"] = (portfolio["WeightPct"] / 100.0) * amount
         portfolio = portfolio.sort_values("AmountTL", ascending=False)
 
-        st.subheader("Portföy Dağılımı (TL)")
-        show_df = portfolio.copy()
-        show_df["WeightPct"] = show_df["WeightPct"].map(lambda x: f"%{x:.1f}")
-        show_df["AmountTL"] = show_df["AmountTL"].map(lambda x: f"{x:,.0f} TL")
-        st.dataframe(show_df, use_container_width=True, hide_index=True)
+        with st.container(border=True):
+            st.markdown("### Portföy Dağılımı (TL)")
+            show_df = portfolio.copy()
+            show_df["WeightPct"] = show_df["WeightPct"].map(lambda x: f"%{x:.1f}")
+            show_df["AmountTL"] = show_df["AmountTL"].map(lambda x: f"{x:,.0f} TL")
+            st.dataframe(show_df, use_container_width=True, hide_index=True)
 
-        fig = px.pie(portfolio, names="Asset", values="AmountTL", title="Portföy Dağılımı - Plotly Pie")
-        fig.update_traces(textposition="inside", textinfo="percent+label")
-        st.plotly_chart(fig, use_container_width=True)
+            fig = px.pie(portfolio, names="Asset", values="AmountTL", title="Portföy Dağılımı - Plotly Pie")
+            fig.update_traces(textposition="inside", textinfo="percent+label")
+            st.plotly_chart(fig, use_container_width=True)
 
-    with right:
-        st.subheader("Makro Göstergeler (Son 12 Ay)")
-        if not market_df.empty:
-            st.line_chart(market_df.set_index("Dönem")[["Enflasyon", "Politika Faizi"]], use_container_width=True)
-        else:
-            st.info("Makro göstergeler okunamadı.")
+        with st.container(border=True):
+            st.markdown("### Rationale / Basic Findings")
+            for title, detail in findings[:6]:
+                st.markdown(f"- **{title}:** {detail}")
 
-        st.subheader("Rationale / Basic Findings")
-        for title, detail in findings[:6]:
-            st.markdown(f"- **{title}:** {detail}")
+        with st.container(border=True):
+            st.markdown("### Historical Performance Simulation")
+            years = st.slider("Simülasyon süresi (yıl)", min_value=1, max_value=5, value=5)
+            scenario = returns_df[returns_df["Profil"] == selected_profile]
+            if not scenario.empty:
+                min_r = float(scenario["MinAnnual"].iloc[0])
+                max_r = float(scenario["MaxAnnual"].iloc[0])
+                future_min = amount * ((1 + min_r) ** years)
+                future_max = amount * ((1 + max_r) ** years)
+                st.markdown(
+                    f"- **Veri kaynağı:** `portfoy_onerileri.csv` yıllık getiri bandı\n"
+                    f"- **{years} yıllık olası aralık:** `{future_min:,.0f} TL` - `{future_max:,.0f} TL`\n"
+                    f"- **Çarpan aralığı:** `x{future_min / amount:.2f}` - `x{future_max / amount:.2f}`"
+                )
+                rec = scenario["Recommendation"].iloc[0]
+                if rec:
+                    st.markdown(f"- **Profil önerisi notu:** {rec}")
+            else:
+                st.info("Getiri senaryosu bulunamadı.")
 
-    st.divider()
-    st.subheader("Temsili Fon Önerileri")
-    rep = filter_representative_funds(funds_df, portfolio["Asset"].tolist())
-    if rep.empty:
-        st.info("Fon göstergeleri verisinden eşleşen örnek fon bulunamadı.")
-    else:
-        st.dataframe(rep, use_container_width=True, hide_index=True)
+            selected_en = UI_PROFILE_LABELS[selected_profile]
+            if selected_en in PPTX_BENCHMARK_MULTIPLIERS_5Y and years == 5:
+                bench = PPTX_BENCHMARK_MULTIPLIERS_5Y[selected_en]
+                st.markdown(f"**Analysis summary benchmark:** {selected_en} profilinde 5 yılda yaklaşık `x{bench}` senaryo örneği.")
 
-    st.subheader("Historical Performance Simulation")
-    years = st.slider("Simülasyon süresi (yıl)", min_value=1, max_value=5, value=5)
-    scenario = returns_df[returns_df["Profil"] == selected_profile]
-    if not scenario.empty:
-        min_r = float(scenario["MinAnnual"].iloc[0])
-        max_r = float(scenario["MaxAnnual"].iloc[0])
-        future_min = amount * ((1 + min_r) ** years)
-        future_max = amount * ((1 + max_r) ** years)
-        st.markdown(
-            f"- **Veri kaynağı:** `portfoy_onerileri.csv` yıllık getiri bandı\n"
-            f"- **{years} yıllık olası aralık:** `{future_min:,.0f} TL` - `{future_max:,.0f} TL`\n"
-            f"- **Çarpan aralığı:** `x{future_min / amount:.2f}` - `x{future_max / amount:.2f}`"
-        )
-        rec = scenario["Recommendation"].iloc[0]
-        if rec:
-            st.markdown(f"- **Profil önerisi notu:** {rec}")
-    else:
-        st.info("Getiri senaryosu bulunamadı.")
-
-    selected_en = UI_PROFILE_LABELS[selected_profile]
-    if selected_en in PPTX_BENCHMARK_MULTIPLIERS_5Y and years == 5:
-        bench = PPTX_BENCHMARK_MULTIPLIERS_5Y[selected_en]
-        st.markdown(f"**Analysis summary benchmark:** {selected_en} profilinde 5 yılda yaklaşık `x{bench}` senaryo örneği.")
+        if st.button("Recalculate / Retake Quiz", use_container_width=True):
+            st.session_state.step_done = False
+            st.session_state.final_profile = ""
+            st.rerun()
 
 
 if __name__ == "__main__":
